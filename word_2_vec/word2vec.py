@@ -3,7 +3,7 @@ import pandas as pd
 import os
 import jieba
 import pickle
-
+from  tqdm import tqdm
 
 def load_stop_words(file="D:\\Program Files\\code\\word_2_vec\\data\\stopwords.txt"):
     with open(file, 'r', encoding="utf-8") as f:
@@ -37,7 +37,39 @@ def get_dict(data):
     return word_2_index, index_2_word, word_2_onehot
 
 
+def softmax(x):
+    ex = np.exp(x)
+    return ex / np.sum(ex, axis=1, keepdims=True)
+
+
 if __name__ == '__main__':
     data = cut_words()
     word_2_index, index_2_word, word_2_onehot = get_dict(data)
-    pass
+    word_size = len(word_2_index)
+    embedding_num = 107
+    learn_rate = 0.01
+    epoch = 10
+    n_gram = 3
+
+    w1 = np.random.normal(-1, 1, size=(word_size, embedding_num))
+    w2 = np.random.normal(-1, 1, size=(embedding_num, word_size))
+    for e in range(epoch):
+        for words in tqdm(data):
+            for n_index, now_word in enumerate(words):
+                now_word_onehot = word_2_onehot[now_word]
+                other_words = words[max(n_index - n_gram, 0):n_index] + words[n_index + 1:n_index + 1 + n_gram]
+                for other_word in other_words:
+                    other_word_onehot = word_2_onehot[other_word]
+                    hidden = now_word_onehot @ w1
+                    p = hidden @ w2
+                    pre = softmax(p)
+
+                    los = -np.sum(other_word_onehot*np.log(pre))
+                    G2 = pre-other_word_onehot
+                    delta_w2 = hidden.T @ G2
+                    G1 = G2 @ w2.T
+                    delta_w1 = now_word_onehot.T @ G1
+                    w1 -= learn_rate * delta_w1
+                    w2 -= learn_rate * delta_w2
+    with open("word2vec.pk1","wb"):
+        pickle.dump([w1,word_2_index,index_2_word],f)
